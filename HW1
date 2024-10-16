@@ -1,0 +1,191 @@
+导入MNIST数据集：
+from torchvision import datasets, transforms
+
+train_data = datasets.MNIST(root="./MNIST", 
+                            train=True, 
+                            transform=transforms.ToTensor(), 
+                            download=False)
+
+test_data = datasets.MNIST(root="./MNIST", 
+                           train=True, 
+                           transform=transforms.ToTensor(), 
+                           download=False)
+
+print(train_data)
+print(test_data)
+导入库：
+import torch  
+import torch.nn as nn  
+import torch.optim as optim  
+from torch.utils.data import DataLoader, TensorDataset, random_split  
+import numpy as np  
+定义模型：
+class SimpleMLP(nn.Module):  
+    def __init__(self, input_size, hidden_sizes, num_classes):  
+        super(SimpleMLP, self).__init__()  
+        layers = []  
+        prev_size = input_size  
+        for hidden_size in hidden_sizes:  
+            layers.append(nn.Linear(prev_size, hidden_size))  
+            layers.append(nn.ReLU())  
+            layers.append(nn.Dropout(0.5))  # 添加Dropout层  
+            prev_size = hidden_size  
+        layers.append(nn.Linear(prev_size, num_classes))  
+        self.network = nn.Sequential(*layers)  
+  
+    def forward(self, x):  
+        return self.network(x)
+
+数据集预处理和加载：
+# 假设X_labeled, y_labeled是标记数据，X_unlabeled是未标记数据  
+# 这些数据应该是numpy数组或类似格式，并且已经过适当的预处理（如归一化）  
+  
+# 为了演示，我们生成一些随机数据  
+np.random.seed(0)  
+X_labeled = np.random.rand(600, 784)  # 假设每个样本有784个特征（如MNIST）  
+y_labeled = np.random.randint(0, 10, 600)  # 10个类别  
+X_unlabeled = np.random.rand(60000, 784)  
+  
+# 将数据转换为Tensor  
+X_labeled_tensor = torch.tensor(X_labeled, dtype=torch.float32)  
+y_labeled_tensor = torch.tensor(y_labeled, dtype=torch.long)  
+X_unlabeled_tensor = torch.tensor(X_unlabeled, dtype=torch.float32)  
+  
+# 创建DataLoader  
+labeled_dataset = TensorDataset(X_labeled_tensor, y_labeled_tensor)  
+unlabeled_dataset = TensorDataset(X_unlabeled_tensor)  
+  
+train_size = int(0.8 * len(labeled_dataset))  
+val_size = len(labeled_dataset) - train_size  
+labeled_train_dataset, labeled_val_dataset = random_split(labeled_dataset, [train_size, val_size])  
+  
+train_loader = DataLoader(labeled_train_dataset, batch_size=32, shuffle=True)  
+val_loader = DataLoader(labeled_val_dataset, batch_size=32, shuffle=False)  
+unlabeled_loader = DataLoader(unlabeled_dataset, batch_size=32, shuffle=True)
+训练模型：
+def train_model(model, train_loader, unlabeled_loader, criterion, optimizer, num_epochs, alpha_schedule):  
+    model.train()  
+    for epoch in range(num_epochs):  
+        # 训练标记数据  
+        for inputs, labels in tqdm.tqdm(train_loader):  
+            optimizer.zero_grad()  
+            outputs = model(inputs)  
+            loss = criterion(outputs, labels)  
+            loss.backward()  
+            optimizer.step()  
+  
+        # 使用Pseudo-Label训练未标记数据  
+        model.eval()  # 切换到评估模式以生成Pseudo-Labels  
+        pseudo_labels = []  
+        with torch.no_grad():  
+            for inputs in unlabeled_loader:  
+                outputs = model(inputs)  
+                _, preds = torch.max(outputs, 1)  
+                pseudo_labels.extend(preds.numpy())
+数据集可视化：
+import torchvision
+from torchvision import datasets, transforms
+from torch.utils.data import DataLoader
+import numpy as np
+import matplotlib.pyplot as plt
+
+train_data = datasets.MNIST(root="./MNIST",
+                            train=True,
+                            transform=transforms.ToTensor(),
+                            download=False)
+
+train_loader = DataLoader(dataset=train_data,
+                          batch_size=64,
+                          shuffle=True)
+
+for num, (image, label) in enumerate(train_loader):
+    image_batch = torchvision.utils.make_grid(image, padding=2)
+    plt.imshow(np.transpose(image_batch.numpy(), (1, 2, 0)), vmin=0, vmax=255)
+    plt.show()
+print(label)
+
+import torch  
+import torch.nn as nn  
+import torch.optim as optim  
+from torchvision import datasets, transforms  
+from torch.utils.data import DataLoader, ConcatDataset, random_split  
+import numpy as np  
+import matplotlib.pyplot as plt  
+from sklearn.manifold import TSNE  （这一块找csdn的时候不知道哪里出问题了运行不了）
+  
+# 定义去噪自编码器  
+class DenoisingAutoencoder(nn.Module):  
+    def __init__(self, input_dim, hidden_dim):  
+        super(DenoisingAutoencoder, self).__init__()  
+        self.encoder = nn.Sequential(  
+            nn.Linear(input_dim, hidden_dim),  
+            nn.ReLU(True),  
+            nn.Linear(hidden_dim, hidden_dim),  
+            nn.ReLU(True)  
+        )  
+        self.decoder = nn.Sequential(  
+            nn.Linear(hidden_dim, hidden_dim),  
+            nn.ReLU(True),  
+            nn.Linear(hidden_dim, input_dim),  
+            nn.Sigmoid()  
+        )  
+  
+    def forward(self, x):  
+        x = self.encoder(x)  
+        x = self.decoder(x)  
+        return x  
+  
+# 定义主模型  
+class MainModel(nn.Module):  
+    def __init__(self, input_dim, hidden_dim, num_classes):  
+        super(MainModel, self).__init__()  
+        self.hidden = nn.Linear(input_dim, hidden_dim)  
+        self.relu = nn.ReLU()  
+        self.output = nn.Linear(hidden_dim, num_classes)  
+        self.sigmoid = nn.Sigmoid()  
+        self.dropout = nn.Dropout(p=0.5)  
+  
+    def forward(self, x):  
+        x = self.dropout(x)  
+        x = self.hidden(x)  
+        x = self.relu(x)  
+        x = self.dropout(x)  
+        x = self.output(x)  
+        x = self.sigmoid(x)  
+        return x  
+  
+# 加载MNIST数据集  
+transform = transforms.Compose([transforms.ToTensor(), transforms.Lambda(lambda x: x.view(-1))])  
+mnist_train = datasets.MNIST(root='./data', train=True, download=True, transform=transform)  
+mnist_test = datasets.MNIST(root='./data', train=False, download=True, transform=transform)  
+  
+# 划分数据集为带标签和不带标签的部分  
+labeled_indices = np.random.choice(len(mnist_train), 600, replace=False)  
+unlabeled_indices = [i for i in range(len(mnist_train)) if i not in labeled_indices]  
+labeled_dataset = torch.utils.data.Subset(mnist_train, labeled_indices)  
+unlabeled_dataset = torch.utils.data.Subset(mnist_train, unlabeled_indices)  
+  
+# 数据加载器  
+labeled_loader = DataLoader(labeled_dataset, batch_size=64, shuffle=True)  
+unlabeled_loader = DataLoader(unlabeled_dataset, batch_size=64, shuffle=True)  
+test_loader = DataLoader(mnist_test, batch_size=1000, shuffle=False)  
+  
+# 参数设置  
+input_dim = 784  # 28x28  
+hidden_dim = 5000  
+num_classes = 10  
+num_epochs = 50  
+learning_rate = 0.01  
+momentum = 0.9  
+  
+# 初始化模型和优化器  
+autoencoder = DenoisingAutoencoder(input_dim, hidden_dim)  
+model = MainModel(input_dim, hidden_dim, num_classes)  
+criterion = nn.CrossEntropyLoss()  # 对于有监督学习使用CrossEntropyLoss  
+optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)  
+  
+# 训练去噪自编码器（预训练）  
+def train_autoencoder(model, loader, epochs=10, lr=0.01):  
+    criterion = nn.BCELoss()  # 对于自编码器使用Binary Cross Entropy Loss  
+    optimizer = optim.Adam(model.parameters(), lr=lr)  
+    model.
